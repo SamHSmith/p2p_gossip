@@ -11,8 +11,8 @@ To build the program simply run `cargo build` which will produce the binary in `
 # This starts a peer on ipv4 port 25532 with a messaging period of 8 seconds.
 # If you want to start it on ipv6 pass the --use-ipv6 flag.
 
-# Subsequent peers can be started the same way. You use the --connect flag in order to make them connect
-# to an initial other peer. Here is an example where we create a network of three peers.
+# Subsequent peers can be started the same way. You use the --connect flag in order to make them
+# connect to an initial other peer. Here is an example where we create a network of three peers.
 
 ./p2p_gossip --port=25532 --period=8
 ./p2p_gossip --connect="127.0.0.1:25532" --port=25533 --period=15
