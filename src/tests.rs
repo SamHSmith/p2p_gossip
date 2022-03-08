@@ -17,7 +17,7 @@ fn dying_chain_ipv4_test() {
             Some(Duration::from_secs(30)),
             &mut Vec::new(),
             false,
-        );
+        ).unwrap();
     });
 
     std::thread::sleep(Duration::from_millis(20));
@@ -36,7 +36,7 @@ fn dying_chain_ipv4_test() {
                 Some(Duration::from_secs(30)),
                 &mut Vec::new(),
                 false,
-            );
+            ).unwrap();
         });
         std::thread::sleep(Duration::from_millis(1500));
     }
@@ -57,7 +57,7 @@ fn dying_chain_ipv4_test() {
             Some(Duration::from_secs(35)),
             &mut *array,
             true,
-        );
+        ).unwrap();
     });
 
     std::thread::sleep(Duration::from_millis(800));
@@ -75,7 +75,7 @@ fn dying_chain_ipv4_test() {
         Some(Duration::from_secs(30)),
         &mut sent_gossips,
         true,
-    );
+    ).unwrap();
 
     let array = received_gossips2.lock().unwrap();
     for gossip in sent_gossips
@@ -102,7 +102,7 @@ fn three_way_ipv6_test() {
             Some(Duration::from_secs(20)),
             &mut Vec::new(),
             false,
-        );
+        ).unwrap();
     });
 
     std::thread::sleep(Duration::from_millis(20));
@@ -123,7 +123,7 @@ fn three_way_ipv6_test() {
             Some(Duration::from_secs(20)),
             &mut *array,
             true,
-        );
+        ).unwrap();
     });
 
     std::thread::sleep(Duration::from_millis(300));
@@ -141,7 +141,7 @@ fn three_way_ipv6_test() {
         Some(Duration::from_secs(15)),
         &mut sent_gossips,
         true,
-    );
+    ).unwrap();
 
     let array = received_gossips2.lock().unwrap();
     for gossip in sent_gossips

@@ -235,7 +235,7 @@ fn do_peer(
     if listener_res.is_err()
     {
         println!("Error: Failed to open tcp listen socket on port {}.", port);
-        return Some(());
+        return None;
     }
     let listener = listener_res.unwrap();
     listener
@@ -723,7 +723,7 @@ fn main() {
 
     if do_peer(use_ipv6, Duration::from_secs(period_maybe.unwrap()), port_maybe.unwrap(), connect_addr_maybe.as_ref(), None, &mut Vec::new(), false).is_none()
     {
-        println!("Failed to connect to initial peer");
+        println!("Failed to connect to initial peer or bind listener socket.");
         return;
     }
 }
