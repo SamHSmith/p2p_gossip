@@ -13,16 +13,38 @@ use std::fmt::Write as FmtWrite;
 #[cfg(test)]
 mod tests;
 
+/// This byte sequence is a rudimentary guard against garbage incomming connections.
 const INITIAL_CONNECTION_MAGIC: &str =
     "Hello there I am a peer from the fantastic p2p_gossip program version v0.1";
+
+/// This is the read and write timout that gets set on all the TcpStreams.
 const READ_AND_WRITE_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Every so often the know about peers are polled for their peer lists. This duration is how often
+/// that polling should be done.
 const ASK_FOR_PEERS_TIME: Duration = Duration::from_millis(1000);
 
+/// A handshake has to be performed before two peers can be properly connected. This duration
+/// is the time allowed for that handshake to be performed. This handshake is the "confirming" of
+/// the connecting peer.
 const PEER_CONFIRMATION_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// Each peer needs to keep track of the gossip they have already heard in order to avoid double
+/// sending or gossip that keeps getting sent around in the network. This presents a problem
+/// because we cannot accumulate gossip endlessly or we will run out of memory. To avoid this
+/// memory leak, the already heard gossip has a decay time. Gossips are forgotten after this
+/// duration.
 const ALREADY_HEARD_GOSSIP_DECAY_TIME: Duration = Duration::from_secs(50);
 
+/// Each peer runs in a single threaded fashion. This means that if the processing of an incomming
+/// packet takes a long time, all other peer connections will get neglected and potentially
+/// disconnected. The peer discovery response packet is variable size and bounded by this constant
+/// in order to avoid blocking or malicious attacks.
 const PEER_DATA_PACKET_ADDRESS_COUNT_MAX: u16 = 5;
 
+/// This is the data structure that bundles a peer connection. The TcpStream itself, the remote
+/// peer's listening address, the peer discovery timer, the confirmation state and the connection
+/// instant.
 #[derive(Debug)]
 struct Peer {
     stream: TcpStream,
@@ -47,6 +69,19 @@ impl Peer {
     }
 }
 
+/// Connect to a remote peer. It can fail and it therefore returns an option.
+/// The function panics if any type of OS error occurs. An error of this sort
+/// will affect all other networking and the application is built uppon the assumtion
+/// that the syscalls won't fail. If any other error occurs the function simply aborts and no
+/// new peer connection is produced.
+///
+/// The data sent looks as follows:
+/// ```
+/// %MAGIC%
+/// %IS_IPV6_BOOL%
+/// %THIS NODES LISTENING IP ADDRESS%
+/// %THIS NODES LISTENING PORT%
+/// ```
 fn connect_to_peer(con_addr: &SocketAddr, listener_addr: &SocketAddr) -> Option<Peer> {
     let stream_res = TcpStream::connect_timeout(con_addr, Duration::from_secs(10));
     if stream_res.is_err()
@@ -110,6 +145,8 @@ fn connect_to_peer(con_addr: &SocketAddr, listener_addr: &SocketAddr) -> Option<
     Some(Peer::new(stream, peer_addr))
 }
 
+/// Accept an incomming connection from a remote peer. If there is an OS error, panic.
+/// If there is any I/O error or the remote peer is not following protocol, return None.
 fn accept_connection(mut stream: TcpStream) -> Option<Peer> {
     stream
         .set_read_timeout(Some(READ_AND_WRITE_TIMEOUT))
@@ -207,6 +244,7 @@ fn accept_connection(mut stream: TcpStream) -> Option<Peer> {
 
 const GOSSIP_LEN: usize = 10;
 
+/// Send some gossip. Returns false if there was an error.
 fn send_gossip(peer: &mut Peer, gossip: &[u8; GOSSIP_LEN]) -> bool {
     if peer.stream.write_u8(1).is_err() {
         return false;
@@ -217,6 +255,30 @@ fn send_gossip(peer: &mut Peer, gossip: &[u8; GOSSIP_LEN]) -> bool {
     return true;
 }
 
+/// Perform the functionality of a peer in the p2p network.
+/// The function is goes through different phases in a loop once it has finished setup.
+///
+/// First it deals with 1 incomming connection if there is one. The reason it does not do more
+/// is to avoid blocking too long and provide natural interleaving of the work to be done.
+///
+/// The second phase is reading and responding to incomming data packets. Only 1 packet is read per
+/// peer for the same reasoning as only dealing with 1 incomming connection per loop. The packets
+/// are identified by the first byte.
+/// ```
+/// 1 - incomming gossip
+/// 2 - peer request
+/// 3 - incomming peer data
+/// 4 - confirmation/ack from a peer you have connected to
+/// ```
+///
+/// The third phase connects to the new addresses that we have been made aware of in the
+/// second phase. If the connecting process fails for some reason, the address is simply
+/// forgotten about.
+///
+/// In the final and fourth stage the function does most of it's sending. Gossips are broadcast and
+/// peer data is requested.
+///
+/// The function does the above loop forever unless a `self_destruct_time` was provided.
 fn do_peer(
     use_ipv6: bool,
     gossip_period: Duration,
@@ -619,6 +681,7 @@ fn do_peer(
 
 use std::str::FromStr;
 
+/// Parse commandline arguments in order to invoke `do_peer`.
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 3 || args.len() > 5

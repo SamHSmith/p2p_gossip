@@ -5,6 +5,24 @@ use std::time::Duration;
 use std::net::IpAddr;
 use std::sync::{Arc, Mutex};
 
+/// This test is used to make sure the networks peer discovery and disconnect handling works.
+/// It does this by building a network shaped like a chain, every node is initially connected
+/// to only 2 others. The two edge nodes are used to test the network, one will send gossip,
+/// the other will record the gossip it "hears". During the test non edge nodes are taken offline
+/// without notice to the other peers until the network only has two peers left, the edge peers.
+/// This is done using the `self_destruct_time` optional argument to `do_peer`.
+///
+/// Since one node is sending and one node is receiving we can simplify the problem of testing
+/// to gossip *awareness*. Passing `should_use_gossip_awareness` as true on the edge nodes causes
+/// them to accumulate the gossips they send and receive in the associated `gossip_awareness` array.
+/// The two awareness arrays of the edge nodes are compared at the end and if the receiving node has
+/// not received all the sent gossips the test fails.
+///
+/// If any of the nodes either fails to start listening on a tcp port or fails to connect
+/// to their initial peer there will be a panic and the test will fail. As is the nature with these
+/// things, the tests could fail because the ports are *in use* by another process on the machine.
+///
+/// It may be wise to move away panics and instead simply assert a Result type returned from do_peer.
 #[test]
 fn dying_chain_ipv4_test() {
     let base_port = 11400;
@@ -89,7 +107,9 @@ fn dying_chain_ipv4_test() {
     }
 }
 
-
+/// This test is similar to `dying_chain_ipv4_test` except it only has 3 nodes and so it
+/// does not test the peer discovering capabilities. It uses ipv6 instead of ipv4 and so it
+/// might fail on a system without ipv6 support.
 #[test]
 fn three_way_ipv6_test() {
     let base_port = 11500;
